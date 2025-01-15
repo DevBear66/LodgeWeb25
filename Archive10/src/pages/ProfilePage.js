@@ -52,8 +52,12 @@ const ProfilePage = () => {
     // Determine if a field is editable
     const isFieldEditable = (fieldName) => {
         const adminOnlyFields = ["currentDegree", "passedDate", "raisedDate"];
-        if (editable) return true;
-        return !adminOnlyFields.includes(fieldName);
+        if (userRole === "admin") {
+            return true; // Admin can edit all fields
+        }
+        // Users can only edit specific fields
+        const userEditableFields = ["contactInfo.phone", "contactInfo.address"];
+        return userEditableFields.includes(fieldName);
     };
 
     if (error) return <div>{error}</div>;

@@ -12,9 +12,9 @@ function App() {
     return (
         <Router>
             <nav className="navbar navbar-expand-lg navbar-light bg-light">
-                <a className="navbar-brand" href="/">Athelstan 9033</a>
+                <a className="navbar-brand" href="/Archive10/public">Athelstan 9033</a>
                 <div>
-                    <a className="nav-link" href="/">Home</a>
+                    <a className="nav-link" href="/Archive10/public">Home</a>
                     <a className="nav-link" href="/about">About</a>
                     <a className="nav-link" href="/login">Login</a>
                 </div>

@@ -34,34 +34,42 @@ app.listen(PORT, () => {
 app.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
-        console.log(`Login attempt for email: ${email}`);
+        console.log(`[LOGIN] Attempting login for email: ${email}`);
 
+        // Normalize email
         const normalizedEmail = email.toLowerCase();
         const user = await User.findOne({ email: normalizedEmail });
         if (!user) {
-            console.error("User not found");
+            console.error("[LOGIN] User not found");
             return res.status(404).json({ error: "User not found" });
         }
 
+        console.log("[LOGIN] User found:", user);
+
+        // Compare passwords
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            console.error("Invalid password");
+            console.error("[LOGIN] Invalid password");
             return res.status(401).json({ error: "Invalid password" });
         }
 
+        console.log("[LOGIN] Password valid");
+
+        // Generate JWT
         const token = jwt.sign(
             { id: user._id, role: user.role },
             process.env.JWT_SECRET,
             { expiresIn: "4h" }
         );
 
-        console.log("Login successful");
+        console.log("[LOGIN] Login successful for role:", user.role);
         res.status(200).json({ message: "Login successful", token, role: user.role });
     } catch (error) {
-        console.error("Login error:", error);
+        console.error("[LOGIN] Server error during login:", error);
         res.status(500).json({ error: "Server error" });
     }
 });
+
 
 
 // Create a new user with a unique code
@@ -115,18 +123,18 @@ app.put("/admin/users/:id", verifyToken, checkRole("admin"), async (req, res) =>
         const { id } = req.params;
         const updates = req.body;
 
-        console.log(`Updating user with ID: ${id}`, updates); // Debug log
+        console.log(`[ADMIN] Updating user with ID: ${id}`, updates);
 
         const updatedUser = await User.findByIdAndUpdate(id, updates, { new: true });
         if (!updatedUser) {
-            console.error("User not found");
+            console.error("[ADMIN] User not found");
             return res.status(404).json({ error: "User not found" });
         }
 
-        console.log("Profile updated successfully", updatedUser); // Debug log
+        console.log("[ADMIN] Profile updated successfully:", updatedUser);
         res.status(200).json({ message: "Profile updated successfully", user: updatedUser });
     } catch (error) {
-        console.error("Error updating profile:", error);
+        console.error("[ADMIN] Error updating profile:", error);
         res.status(500).json({ error: "Server error" });
     }
 });
