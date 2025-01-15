@@ -2,33 +2,33 @@ const jwt = require("jsonwebtoken");
 
 // Middleware to verify JWT token
 const verifyToken = (req, res, next) => {
-    const token = req.header("Authorization")?.split(" ")[1]; // Extract the token
+    const token = req.header("Authorization")?.split(" ")[1];
     if (!token) {
-        console.error("Token missing in request"); // Debug log
-        return res.status(401).json({ error: "Unauthorized: No token provided" });
+        console.error("Token missing in request");
+        return res.status(401).json({ error: "Unauthorized" });
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verify the token
-        req.user = decoded; // Attach decoded user data (id, role) to the request
-        console.log("Token verified successfully:", decoded); // Debug log
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded; // Attach user data to the request
+        console.log("Token verified:", decoded); // Debug log
         next();
     } catch (error) {
-        console.error("Token verification failed:", error.message); // Debug log
-        res.status(401).json({ error: "Invalid or expired token" });
+        console.error("Invalid token:", error);
+        res.status(401).json({ error: "Invalid token" });
     }
 };
 
 // Middleware to check user role
-const checkRole = (...roles) => (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-        console.error(
-            `Access denied: User role '${req.user.role}' is not in [${roles}]`
-        ); // Debug log
+const checkRole = (requiredRole) => (req, res, next) => {
+    if (req.user.role !== requiredRole) {
+        console.error(`Access denied: User role '${req.user.role}' does not match required role '${requiredRole}'`);
         return res.status(403).json({ error: "Forbidden: Insufficient permissions" });
     }
     next();
 };
+
+
 
 module.exports = { verifyToken, checkRole };
 

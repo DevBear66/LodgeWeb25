@@ -31,64 +31,37 @@ app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
 
-// Create Admin and Regular User for Testing
-app.post("/test-create-users", async (req, res) => {
-    try {
-        // Admin User
-        const adminPassword = await bcrypt.hash("securepassword123", 10);
-        const adminUser = new User({
-            username: "Admin User",
-            email: "admin@example.com",
-            password: adminPassword,
-            role: "admin",
-        });
-
-        // Regular User
-        const userPassword = await bcrypt.hash("userpassword123", 10);
-        const regularUser = new User({
-            username: "Regular User",
-            email: "user@example.com",
-            password: userPassword,
-            role: "user",
-        });
-
-        // Save users to the database
-        await adminUser.save();
-        await regularUser.save();
-
-        res.status(201).json({ message: "Test users created successfully!" });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Error creating test users" });
-    }
-});
-
 app.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
+        const normalizedEmail = email.toLowerCase();
 
-        // Find user by email
-        const user = await User.findOne({ email });
-        if (!user) return res.status(404).json({ error: "User not found" });
+        console.log(`Login attempt for email: ${normalizedEmail}`); // Debug log
 
-        // Compare passwords
+        const user = await User.findOne({ email: normalizedEmail });
+        if (!user) {
+            console.error("User not found");
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        console.log(`User found: ${user.username}`); // Debug log
+
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(401).json({ error: "Invalid password" });
+        if (!isMatch) {
+            console.error("Invalid password");
+            return res.status(401).json({ error: "Invalid password" });
+        }
 
-        // Generate JWT token
-        const token = jwt.sign(
-            { id: user._id, role: user.role },
-            process.env.JWT_SECRET,
-            { expiresIn: "4h" }
-        );
+        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "4h" });
 
-        // Send role along with the token
+        console.log("Login successful", { role: user.role }); // Debug log
         res.status(200).json({ message: "Login successful", token, role: user.role });
     } catch (error) {
-        console.error(error);
+        console.error("Server error during login:", error);
         res.status(500).json({ error: "Server error" });
     }
 });
+
 
 // Create a new user with a unique code
 app.post("/admin/users", verifyToken, checkRole("admin"), async (req, res) => {
@@ -131,6 +104,28 @@ app.delete("/admin/users/:id", verifyToken, checkRole("admin"), async (req, res)
         res.status(200).json({ message: "User deleted successfully" });
     } catch (error) {
         console.error(error);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
+// Update user profile (Admin only)
+app.put("/admin/users/:id", verifyToken, checkRole("admin"), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updates = req.body;
+
+        console.log(`Updating user with ID: ${id}`, updates); // Debug log
+
+        const updatedUser = await User.findByIdAndUpdate(id, updates, { new: true });
+        if (!updatedUser) {
+            console.error("User not found");
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        console.log("Profile updated successfully", updatedUser); // Debug log
+        res.status(200).json({ message: "Profile updated successfully", user: updatedUser });
+    } catch (error) {
+        console.error("Error updating profile:", error);
         res.status(500).json({ error: "Server error" });
     }
 });
@@ -205,6 +200,41 @@ app.get("/user/profile/:id", verifyToken, async (req, res) => {
         res.status(500).json({ error: "Server error." });
     }
 });
+
+// Fetch user profile by username
+app.get("/user/profile/:username", verifyToken, async (req, res) => {
+    try {
+        const { username } = req.params;
+
+        // Allow admins to fetch any profile
+        if (req.user.role === "admin" || req.user.role === "bigadmin") {
+            const user = await User.findOne({ username }, "-password");
+            if (!user) {
+                console.error("User not found");
+                return res.status(404).json({ error: "User not found" });
+            }
+            return res.status(200).json(user);
+        }
+
+        // Regular users can fetch only their own profile
+        if (req.user.username !== username) {
+            console.error("Access denied: User attempting to access another user's profile");
+            return res.status(403).json({ error: "Access denied" });
+        }
+
+        const user = await User.findOne({ username }, "-password");
+        if (!user) {
+            console.error("User not found");
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        res.status(200).json(user);
+    } catch (err) {
+        console.error("Error fetching profile:", err);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
 
 // Admin-Only Dashboard Route
 app.get("/admin/dashboard", verifyToken, checkRole("admin"), async (req, res) => {

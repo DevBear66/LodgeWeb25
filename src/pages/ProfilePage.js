@@ -1,33 +1,50 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { useParams } from "react-router-dom"; // For dynamic profile routing
+import { useParams } from "react-router-dom";
 
 const ProfilePage = () => {
     const { userId } = useParams(); // Get userId from route parameters
     const [profile, setProfile] = useState(null);
     const [error, setError] = useState("");
-    const [userRole, setUserRole] = useState("");
-    const [editable, setEditable] = useState(false);
+    const [userRole, setUserRole] = useState(""); // To track the logged-in user's role
+    const [loading, setLoading] = useState(true); // Track loading state
 
+    // Fetch profile and user role
     useEffect(() => {
         const fetchProfile = async () => {
             try {
                 const token = localStorage.getItem("token");
                 if (!token) {
                     setError("No token found. Please log in.");
+                    setLoading(false);
                     return;
                 }
 
-                // Fetch profile data
-                const response = await axios.get(`http://localhost:5000/user/profile/${userId}`, {
-                    headers: { Authorization: `Bearer ${token}` },
+                // Fetch user profile
+                const profileResponse = await axios.get(
+                    userId
+                        ? `http://localhost:5000/user/profile/${userId}`
+                        : "http://localhost:5000/user/profile",
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                );
+
+                // Fetch logged-in user's role
+                const roleResponse = await axios.get("http://localhost:5000/user/profile", {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
                 });
 
-                setProfile(response.data);
-                setUserRole(response.data.role); // Track logged-in user's role
-                setEditable(response.data.role === "admin" || response.data.role === "bigadmin");
+                setProfile(profileResponse.data);
+                setUserRole(roleResponse.data.role);
+                setLoading(false);
             } catch (err) {
                 setError(err.response?.data?.error || "Failed to fetch profile.");
+                setLoading(false);
             }
         };
 
@@ -37,8 +54,10 @@ const ProfilePage = () => {
     const handleSave = async () => {
         try {
             const token = localStorage.getItem("token");
-            await axios.put(`http://localhost:5000/user/profile/${userId}`, profile, {
-                headers: { Authorization: `Bearer ${token}` },
+            await axios.put(`http://localhost:5000/admin/users/${profile._id}`, profile, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
             });
             alert("Profile updated successfully!");
         } catch (err) {
@@ -47,15 +66,20 @@ const ProfilePage = () => {
     };
 
     const isFieldEditable = (fieldName) => {
+        const userEditableFields = ["phone", "address"];
         const adminOnlyFields = ["currentDegree", "passedDate", "raisedDate"];
-        if (editable) {
-            return !adminOnlyFields.includes(fieldName); // Restrict only admin fields
+
+        // Admin can edit all fields
+        if (userRole === "admin") {
+            return true;
         }
-        return false; // Non-admins can’t edit restricted fields
+
+        // Regular user can edit only specific fields
+        return userRole === "user" && userEditableFields.includes(fieldName);
     };
 
+    if (loading) return <div>Loading...</div>;
     if (error) return <div>{error}</div>;
-    if (!profile) return <div>Loading...</div>;
 
     return (
         <div className="container mt-5">

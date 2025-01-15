@@ -82,42 +82,6 @@ const AdminDashboard = () => {
         navigate(`/profile/${userId}`); // Navigate to the user's profile page
     };
 
-    return (
-        <table className="table table-bordered">
-            <thead>
-            <tr>
-                <th>Username</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Actions</th>
-            </tr>
-            </thead>
-            <tbody>
-            {users.map((user) => (
-                <tr key={user._id}>
-                    <td>{user.username}</td>
-                    <td>{user.email}</td>
-                    <td>{user.role}</td>
-                    <td>
-                        <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => handleEditProfile(user._id)}
-                        >
-                            Edit Profile
-                        </button>
-                        <button
-                            className="btn btn-danger btn-sm"
-                            onClick={() => handleDeleteUser(user._id)}
-                        >
-                            Delete
-                        </button>
-                    </td>
-                </tr>
-            ))}
-            </tbody>
-        </table>
-    );
-
     // Fetch users list
     const fetchUsers = async () => {
         try {
@@ -220,6 +184,12 @@ const AdminDashboard = () => {
                             )}
                         </td>
                         <td>
+                            <button
+                                onClick={() => handleEditProfile(user._id)}
+                                className="btn btn-primary btn-sm"
+                            >
+                                Edit Profile
+                            </button>
                             <button
                                 onClick={() => handleDeleteUser(user._id)}
                                 className="btn btn-danger btn-sm"
