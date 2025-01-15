@@ -34,17 +34,14 @@ app.listen(PORT, () => {
 app.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
+        console.log(`Login attempt for email: ${email}`);
+
         const normalizedEmail = email.toLowerCase();
-
-        console.log(`Login attempt for email: ${normalizedEmail}`); // Debug log
-
         const user = await User.findOne({ email: normalizedEmail });
         if (!user) {
             console.error("User not found");
             return res.status(404).json({ error: "User not found" });
         }
-
-        console.log(`User found: ${user.username}`); // Debug log
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
@@ -52,12 +49,16 @@ app.post("/login", async (req, res) => {
             return res.status(401).json({ error: "Invalid password" });
         }
 
-        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "4h" });
+        const token = jwt.sign(
+            { id: user._id, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: "4h" }
+        );
 
-        console.log("Login successful", { role: user.role }); // Debug log
+        console.log("Login successful");
         res.status(200).json({ message: "Login successful", token, role: user.role });
     } catch (error) {
-        console.error("Server error during login:", error);
+        console.error("Login error:", error);
         res.status(500).json({ error: "Server error" });
     }
 });
@@ -179,27 +180,57 @@ app.get("/user/profile/:id", verifyToken, async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Allow admins to fetch any profile
-        if (req.user.role === "admin" || req.user.role === "bigadmin") {
-            const user = await User.findById(id, "-password");
-            if (!user) return res.status(404).json({ error: "User not found." });
-            return res.status(200).json(user);
-        }
-
-        // Allow regular users to fetch only their profile
-        if (req.user.id !== id) {
-            return res.status(403).json({ error: "Access denied." });
-        }
-
+        console.log(`Fetching profile for user ID: ${id}`);
         const user = await User.findById(id, "-password");
-        if (!user) return res.status(404).json({ error: "User not found." });
+        if (!user) {
+            console.error("User not found");
+            return res.status(404).json({ error: "User not found" });
+        }
 
+        console.log("Profile fetched successfully", user);
         res.status(200).json(user);
-    } catch (err) {
-        console.error("Error fetching profile:", err);
-        res.status(500).json({ error: "Server error." });
+    } catch (error) {
+        console.error("Error fetching profile:", error);
+        res.status(500).json({ error: "Server error" });
     }
 });
+
+// Update user profile (User-specific)
+app.put("/user/profile/:id", verifyToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updates = req.body;
+        // Allow updates only if the user is editing their own profile
+        if (req.user.id !== id) {
+            console.error("Forbidden: User attempting to update another user's profile");
+            return res.status(403).json({ error: "Forbidden: Cannot update another user's profile" });
+        }
+        // Filter updates to allow only specific fields
+        const allowedFields = ["contactInfo.phone", "contactInfo.address"];
+        const filteredUpdates = {};
+        Object.keys(updates).forEach((key) => {
+            if (allowedFields.includes(key)) {
+                filteredUpdates[key] = updates[key];
+            }
+        });
+        if (Object.keys(filteredUpdates).length === 0) {
+            console.error("No valid fields provided for update");
+            return res.status(400).json({ error: "No valid fields to update" });
+        }
+        console.log(`User updating their profile with ID: ${id}`, filteredUpdates); // Debug log
+        const updatedUser = await User.findByIdAndUpdate(id, filteredUpdates, { new: true });
+        if (!updatedUser) {
+            console.error("User not found");
+            return res.status(404).json({ error: "User not found" });
+        }
+        console.log("User profile updated successfully", updatedUser); // Debug log
+        res.status(200).json({ message: "Profile updated successfully", user: updatedUser });
+    } catch (error) {
+        console.error("Error updating user profile:", error);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
 
 // Fetch user profile by username
 app.get("/user/profile/:username", verifyToken, async (req, res) => {
@@ -249,10 +280,12 @@ app.get("/admin/dashboard", verifyToken, checkRole("admin"), async (req, res) =>
 // Get all users (Admin only)
 app.get("/admin/users", verifyToken, checkRole("admin"), async (req, res) => {
     try {
+        console.log("Admin fetching all users");
         const users = await User.find({}, "username email role code");
+        console.log("Users fetched:", users);
         res.status(200).json(users);
     } catch (error) {
-        console.error(error);
+        console.error("Error fetching users:", error);
         res.status(500).json({ error: "Error fetching users" });
     }
 });

@@ -1,60 +1,44 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom"; // Import useNavigate
 
 const ProfilePage = () => {
-    const { userId } = useParams(); // Get userId from route parameters
+    const { userId } = useParams();
     const [profile, setProfile] = useState(null);
     const [error, setError] = useState("");
-    const [userRole, setUserRole] = useState(""); // To track the logged-in user's role
-    const [loading, setLoading] = useState(true); // Track loading state
+    const [userRole, setUserRole] = useState("");
+    const [editable, setEditable] = useState(false);
+    const navigate = useNavigate(); // Initialize navigate
 
     // Fetch profile and user role
     useEffect(() => {
         const fetchProfile = async () => {
             try {
                 const token = localStorage.getItem("token");
-                if (!token) {
-                    setError("No token found. Please log in.");
-                    setLoading(false);
-                    return;
-                }
-
-                // Fetch user profile
-                const profileResponse = await axios.get(
-                    userId
-                        ? `http://localhost:5000/user/profile/${userId}`
-                        : "http://localhost:5000/user/profile",
-                    {
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                        },
-                    }
-                );
-
-                // Fetch logged-in user's role
-                const roleResponse = await axios.get("http://localhost:5000/user/profile", {
+                const response = await axios.get(`http://localhost:5000/user/profile/${userId}`, {
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },
                 });
-
-                setProfile(profileResponse.data);
-                setUserRole(roleResponse.data.role);
-                setLoading(false);
+                setProfile(response.data);
+                setUserRole(response.data.role);
+                setEditable(response.data.role === "admin");
             } catch (err) {
                 setError(err.response?.data?.error || "Failed to fetch profile.");
-                setLoading(false);
             }
         };
 
         fetchProfile();
     }, [userId]);
 
+    // Handle profile save
     const handleSave = async () => {
         try {
             const token = localStorage.getItem("token");
-            await axios.put(`http://localhost:5000/admin/users/${profile._id}`, profile, {
+            const endpoint = editable
+                ? `http://localhost:5000/admin/users/${profile._id}`
+                : `http://localhost:5000/user/profile/${profile._id}`;
+            await axios.put(endpoint, profile, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -65,26 +49,24 @@ const ProfilePage = () => {
         }
     };
 
+    // Determine if a field is editable
     const isFieldEditable = (fieldName) => {
-        const userEditableFields = ["phone", "address"];
         const adminOnlyFields = ["currentDegree", "passedDate", "raisedDate"];
-
-        // Admin can edit all fields
-        if (userRole === "admin") {
-            return true;
-        }
-
-        // Regular user can edit only specific fields
-        return userRole === "user" && userEditableFields.includes(fieldName);
+        if (editable) return true;
+        return !adminOnlyFields.includes(fieldName);
     };
 
-    if (loading) return <div>Loading...</div>;
     if (error) return <div>{error}</div>;
+    if (!profile) return <div>Loading...</div>;
 
     return (
         <div className="container mt-5">
+            <button onClick={() => navigate(-1)} className="btn btn-secondary mb-3">
+                Back
+            </button>
             <h1>{profile.username}'s Profile</h1>
             <form>
+                {/* Username */}
                 <div className="mb-3">
                     <label>Username:</label>
                     <input
@@ -94,6 +76,7 @@ const ProfilePage = () => {
                         readOnly
                     />
                 </div>
+                {/* Email */}
                 <div className="mb-3">
                     <label>Email:</label>
                     <input
@@ -103,6 +86,7 @@ const ProfilePage = () => {
                         readOnly
                     />
                 </div>
+                {/* Phone */}
                 <div className="mb-3">
                     <label>Phone:</label>
                     <input
@@ -118,6 +102,7 @@ const ProfilePage = () => {
                         }
                     />
                 </div>
+                {/* Address */}
                 <div className="mb-3">
                     <label>Address:</label>
                     <input
@@ -133,21 +118,27 @@ const ProfilePage = () => {
                         }
                     />
                 </div>
+                {/* Current Degree */}
                 <div className="mb-3">
-                    <label>Masonic Progression:</label>
-                    <input
-                        type="text"
+                    <label>Current Degree:</label>
+                    <select
                         className="form-control"
                         value={profile.progression?.currentDegree || ""}
-                        readOnly={!isFieldEditable("currentDegree")}
+                        disabled={!isFieldEditable("currentDegree")}
                         onChange={(e) =>
                             setProfile({
                                 ...profile,
                                 progression: { ...profile.progression, currentDegree: e.target.value },
                             })
                         }
-                    />
+                    >
+                        <option value="">Select Degree</option>
+                        <option value="Entered Apprentice">Entered Apprentice</option>
+                        <option value="Fellowcraft">Fellowcraft</option>
+                        <option value="Master Mason">Master Mason</option>
+                    </select>
                 </div>
+                {/* Passed Date */}
                 <div className="mb-3">
                     <label>Passed Date:</label>
                     <input
@@ -163,6 +154,7 @@ const ProfilePage = () => {
                         }
                     />
                 </div>
+                {/* Raised Date */}
                 <div className="mb-3">
                     <label>Raised Date:</label>
                     <input
@@ -178,6 +170,7 @@ const ProfilePage = () => {
                         }
                     />
                 </div>
+                {/* Save Button */}
                 <button type="button" className="btn btn-success" onClick={handleSave}>
                     Save
                 </button>
